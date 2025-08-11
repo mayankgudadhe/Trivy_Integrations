@@ -18,14 +18,15 @@ jobs:
           path: ~/.cache/trivy
           key: ${{ runner.os }}-trivy-db
 
-      # Install Trivy
+      # Install Trivy from apt repo (no 404 issues)
       - name: Install Trivy
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y wget
-          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_$(uname -m | sed 's/x86_64/64bit/')_deb.tar.gz -O trivy.tar.gz
-          tar zxvf trivy.tar.gz trivy
-          sudo mv trivy /usr/local/bin/
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -y
+          sudo apt-get install -y trivy
           trivy --version
 
       # Log in to Docker Hub
