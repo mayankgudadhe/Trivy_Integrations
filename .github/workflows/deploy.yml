@@ -25,21 +25,23 @@ jobs:
         IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
         docker build -t $IMAGE_NAME:latest .
 
-    # 4️⃣ Install Trivy
+    # 4️⃣ Install Trivy (latest)
     - name: Install Trivy
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y wget
-        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.52.2_Linux-64bit.deb
-        sudo dpkg -i trivy_0.52.2_Linux-64bit.deb
+        sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update -y
+        sudo apt-get install -y trivy
 
-    # 5️⃣ Scan the Docker image for vulnerabilities
+    # 5️⃣ Scan Docker image for vulnerabilities
     - name: Scan Docker image with Trivy
       run: |
         IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
         trivy image --exit-code 1 --severity CRITICAL,HIGH $IMAGE_NAME:latest
 
-    # 6️⃣ Push image to Docker Hub (only if Trivy scan passes)
+    # 6️⃣ Push Docker image
     - name: Push Docker image
       run: |
         IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
