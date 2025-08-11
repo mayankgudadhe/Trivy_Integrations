@@ -25,7 +25,7 @@ jobs:
         IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
         docker build -t $IMAGE_NAME:latest .
 
-    # 4️⃣ Install Trivy (latest)
+    # 3️⃣ Install Trivy
     - name: Install Trivy
       run: |
         sudo apt-get update -y
@@ -35,14 +35,47 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y trivy
 
-    # 5️⃣ Scan Docker image for vulnerabilities
+    # 4️⃣ Scan with Trivy & Save Report
     - name: Scan Docker image with Trivy
+      id: trivy-scan
       run: |
-        IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
-        trivy image --exit-code 1 --severity CRITICAL,HIGH $IMAGE_NAME:latest
+        IMAGE_NAME=my-app
+        mkdir -p trivy-report
+        trivy image --format table --severity CRITICAL,HIGH --exit-code 0 -o trivy-report/report.txt $IMAGE_NAME:latest
+        trivy image --format json --severity CRITICAL,HIGH --exit-code 0 -o trivy-report/report.json $IMAGE_NAME:latest
+        
+        # Check if vulnerabilities exist
+        if grep -q "CRITICAL\|HIGH" trivy-report/report.txt; then
+          echo "found_vuln=true" >> $GITHUB_ENV
+        else
+          echo "found_vuln=false" >> $GITHUB_ENV
+        fi
 
-    # 6️⃣ Push Docker image
+    # 5️⃣ Upload Trivy Report as Artifact
+    - name: Upload Trivy Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: trivy-vulnerability-report
+        path: trivy-report/
+
+    # 6️⃣ Push to Docker Hub only if no vulnerabilities found
+    - name: Log in to Docker Hub
+      if: env.found_vuln == 'false'
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
     - name: Push Docker image
+      if: env.found_vuln == 'false'
       run: |
         IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app
+        docker tag my-app:latest $IMAGE_NAME:latest
         docker push $IMAGE_NAME:latest
+
+    # 7️⃣ Stop with failure if vulnerabilities found
+    - name: Fail if vulnerabilities found
+      if: env.found_vuln == 'true'
+      run: |
+        echo "❌ Vulnerabilities found! Image not pushed to Docker Hub."
+        exit 1
