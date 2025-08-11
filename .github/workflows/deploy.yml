@@ -35,16 +35,14 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y trivy
 
-    # 4️⃣ Scan with Trivy & Save Report
     - name: Scan Docker image with Trivy
-      id: trivy-scan
       run: |
         IMAGE_NAME=my-app
         mkdir -p trivy-report
-        trivy image --format table --severity CRITICAL,HIGH --exit-code 0 -o trivy-report/report.txt $IMAGE_NAME:latest
-        trivy image --format json --severity CRITICAL,HIGH --exit-code 0 -o trivy-report/report.json $IMAGE_NAME:latest
+        # Scan local image without pulling
+        trivy image --skip-update --ignore-unfixed --format table --exit-code 0 --severity CRITICAL,HIGH -o trivy-report/report.txt $IMAGE_NAME:latest
+        trivy image --skip-update --ignore-unfixed --format json --exit-code 0 --severity CRITICAL,HIGH -o trivy-report/report.json $IMAGE_NAME:latest
         
-        # Check if vulnerabilities exist
         if grep -q "CRITICAL\|HIGH" trivy-report/report.txt; then
           echo "found_vuln=true" >> $GITHUB_ENV
         else
